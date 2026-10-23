@@ -1,0 +1,2 @@
+# keep LF so shell/sbatch scripts run on Zaratan
+* text=auto eol=lf

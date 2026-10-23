@@ -218,3 +218,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- msml612 project ---
+# data and run outputs stay out of git (regenerate with scripts/fetch_azure2019.py + build_dataset.py)
+# data/azure2019_cpu_2000vm.npz is ~166 MB, over GitHub's 100 MB file limit
+/data/
+/outputs/
+/logs/
+*.npz
+*.pt
+*.csv.gz

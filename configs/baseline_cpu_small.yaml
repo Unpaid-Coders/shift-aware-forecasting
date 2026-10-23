@@ -1,0 +1,34 @@
+# Small CPU-scale run of the quantile PatchTST baseline (fits a laptop / login node).
+seed: 612
+out_dir: outputs/baseline_cpu_small
+data:
+  path: data/azure2019_cpu_2000vm.npz
+  vm_limit: 200           # random subset of VMs (0 = all)
+  channels: [avg_cpu]     # inputs; PatchTST is channel-independent
+  target: avg_cpu
+  seq_len: 288            # 1 day of 5-min readings
+  pred_len: 12            # 1 hour ahead
+  quantiles: [0.05, 0.25, 0.5, 0.75, 0.95]
+  train_days: 18
+  val_days: 3             # test = days 21-30
+  train_stride: 6
+  eval_stride: 12
+model:
+  patch_len: 16
+  stride: 8
+  n_layers: 2
+  d_model: 64
+  n_heads: 4
+  d_ff: 128
+  dropout: 0.1
+  fc_dropout: 0.1
+  head_dropout: 0.0
+train:
+  epochs: 8
+  batch_size: 256
+  windows_per_epoch: 60000
+  lr: 0.001
+  weight_decay: 0.0001
+  patience: 3
+  num_threads: 4
+  num_workers: 0

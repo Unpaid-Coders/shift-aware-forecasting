@@ -1,0 +1,30 @@
+{
+ "n_vms": 1909,
+ "n_steps": 8639,
+ "days": 29.99652777777778,
+ "observed_fraction": 0.999212944623378,
+ "avg_cpu_mean": 10.881381034851074,
+ "avg_cpu_median": 6.329203128814697,
+ "per_category": {
+  "Delay-insensitive": {
+   "n": 950,
+   "avg_cpu_mean": 8.490253448486328,
+   "within_vm_std_mean": 3.9295060634613037,
+   "acf_lag1_median": 0.27557945251464844,
+   "acf_lag1day_median": 0.32555779814720154,
+   "acf_lag1week_median": -0.012970725074410439,
+   "frac_strong_daily_cycle(acf>0.5)": 0.21157894736842106
+  },
+  "Interactive": {
+   "n": 959,
+   "avg_cpu_mean": 13.250067710876465,
+   "within_vm_std_mean": 6.054043769836426,
+   "acf_lag1_median": 0.564793586730957,
+   "acf_lag1day_median": 0.3836005628108978,
+   "acf_lag1week_median": 0.2768034040927887,
+   "frac_strong_daily_cycle(acf>0.5)": 0.3357664233576642
+  }
+ },
+ "vms_with_strong_shift_in_test_days": 70,
+ "vms_with_strong_shift_anywhere": 263
+}
