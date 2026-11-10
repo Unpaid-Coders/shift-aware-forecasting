@@ -21,7 +21,7 @@ identical numbers), gap-filled targets skipped.
 Coverage is below target at every level and decreases with the horizon (90% interval:
 86.3% at h=1, about 84% at h=12). Averaged over all VMs, h=1 coverage stays at 84-88%
 throughout the test days, so the gap is steady rather than a visible shift-driven dip;
-shift effects are analysed per VM in the conformal evaluation (`msml612.conformal.run`).
+shift effects are analysed per VM in the conformal evaluation (`shift_aware_forecasting.conformal.run`).
 Figures: `docs/figures/baseline_coverage_over_time_test_s1.png` and `_s12.png`.
 
 ## 2026-09-30: small CPU baseline (`configs/baseline_cpu_small.yaml`)

@@ -1,6 +1,6 @@
 """Train the quantile PatchTST baseline.
 
-  python -m msml612.train --config configs/baseline_cpu_small.yaml [--set train.epochs=2 ...]
+  python -m shift_aware_forecasting.train --config configs/baseline_cpu_small.yaml [--set train.epochs=2 ...]
 """
 import argparse
 import json

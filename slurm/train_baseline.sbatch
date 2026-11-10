@@ -23,7 +23,7 @@ source .venv/bin/activate
 set -u
 export PYTHONPATH=$PWD/src
 CFG=${CFG:-configs/baseline_zaratan.yaml}
-python -m msml612.train --config "$CFG" ${OVERRIDES:-}
+python -m shift_aware_forecasting.train --config "$CFG" ${OVERRIDES:-}
 RUN=$(python -c "import yaml;print(yaml.safe_load(open('$CFG'))['out_dir'])")
-python -m msml612.evaluate --run "$RUN" --stride 12
-python -m msml612.evaluate --run "$RUN" --stride 1     # rolling forecasts for the conformal phase
+python -m shift_aware_forecasting.evaluate --run "$RUN" --stride 12
+python -m shift_aware_forecasting.evaluate --run "$RUN" --stride 1     # rolling forecasts for the conformal phase

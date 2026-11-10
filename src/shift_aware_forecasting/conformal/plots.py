@@ -1,6 +1,6 @@
-"""Figures and a markdown summary from the outputs of msml612.conformal.run.
+"""Figures and a markdown summary from the outputs of shift_aware_forecasting.conformal.run.
 
-  python -m msml612.conformal.plots --out outputs/conformal_zaratan
+  python -m shift_aware_forecasting.conformal.plots --out outputs/conformal_zaratan
 """
 import argparse
 import json

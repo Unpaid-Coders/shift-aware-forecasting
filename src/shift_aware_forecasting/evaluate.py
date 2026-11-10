@@ -4,7 +4,7 @@ Saves predictions.npz (pred [N, H, Q], y [N, H], vm [N], t [N] = first target st
 all in CPU %) so the online conformal wrapper can replay them in time order, plus
 metrics.json and a coverage-over-time plot.
 
-  python -m msml612.evaluate --run outputs/baseline_cpu_small [--stride 1] [--vm-limit 50]
+  python -m shift_aware_forecasting.evaluate --run outputs/baseline_cpu_small [--stride 1] [--vm-limit 50]
 """
 import argparse
 import json

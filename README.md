@@ -18,7 +18,7 @@ their coverage after a distribution shift.
 ```
 configs/            run configs (small CPU run, full Zaratan run)
 scripts/            fetch_azure2019.py -> build_dataset.py -> explore_data.py
-src/msml612/
+src/shift_aware_forecasting/
   data/windows.py   chronological splits + sliding windows
   models/           quantile_patchtst.py (ours) + patchtst/ (vendored, unmodified)
   conformal/        methods.py (ACI / quantile tracker / PID), run.py (sweep + shift evaluation), plots.py
@@ -53,10 +53,10 @@ python scripts/build_dataset.py --raw data/raw/azure2019 --out data/azure2019_cp
 # 3. exploration and natural-shift candidates
 python scripts/explore_data.py --data data/azure2019_cpu_2000vm.npz --out docs/eda
 # 4. baseline (set PYTHONPATH=src)
-python -m msml612.train --config configs/baseline_cpu_small.yaml
-python -m msml612.evaluate --run outputs/baseline_cpu_small
+python -m shift_aware_forecasting.train --config configs/baseline_cpu_small.yaml
+python -m shift_aware_forecasting.evaluate --run outputs/baseline_cpu_small
 # 5. online conformal on the stride-1 test forecasts (CPU only; on Zaratan: slurm/conformal.sbatch)
-python -m msml612.conformal.run --config configs/conformal_zaratan.yaml
+python -m shift_aware_forecasting.conformal.run --config configs/conformal_zaratan.yaml
 ```
 
 ## Results so far

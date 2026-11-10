@@ -1,5 +1,5 @@
 # Online conformal calibration of the quantile PatchTST baseline (CPU only).
-# python -m msml612.conformal.run --config configs/conformal_zaratan.yaml
+# python -m shift_aware_forecasting.conformal.run --config configs/conformal_zaratan.yaml
 predictions: outputs/baseline_zaratan/predictions_test_s1.npz
 out_dir: outputs/conformal_zaratan
 shift_csv: docs/eda/shift_candidates.csv

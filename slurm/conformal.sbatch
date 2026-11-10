@@ -23,4 +23,4 @@ source .venv/bin/activate
 set -u
 export PYTHONPATH=$PWD/src
 CFG=${CFG:-configs/conformal_zaratan.yaml}
-python -m msml612.conformal.run --config "$CFG" --workers "${SLURM_CPUS_PER_TASK:-8}" ${EXTRA_ARGS:-}
+python -m shift_aware_forecasting.conformal.run --config "$CFG" --workers "${SLURM_CPUS_PER_TASK:-8}" ${EXTRA_ARGS:-}

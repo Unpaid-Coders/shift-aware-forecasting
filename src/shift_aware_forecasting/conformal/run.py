@@ -1,9 +1,9 @@
 """Wrap the baseline's rolling test forecasts in online conformal calibration and evaluate,
 with a focus on the VMs that have a natural distribution shift in the test days.
 
-Input: predictions_<split>_s1.npz from msml612.evaluate (stride 1, so every VM has one forecast
-per step). For each interval level, horizon h and VM, the CQR scores of the base interval form
-one time-ordered sequence; each method turns it into offsets q (see methods.py) using only
+Input: predictions_<split>_s1.npz from shift_aware_forecasting.evaluate (stride 1, so every VM
+has one forecast per step). For each interval level, horizon h and VM, the CQR scores of the base
+interval form one time-ordered sequence; each method turns it into offsets q (see methods.py) using only
 scores observed when the forecast is made (ahead = h).
 
 VMs are split into
@@ -13,7 +13,7 @@ VMs are split into
 Outputs in out_dir: metrics.json, selected.json, table_<level>.csv (all configs, all groups),
 shift_table_<level>.csv (before/after shift), traces_<level>.npz, and figures (plots.py).
 
-  python -m msml612.conformal.run --config configs/conformal_zaratan.yaml [--vm-limit 200]
+  python -m shift_aware_forecasting.conformal.run --config configs/conformal_zaratan.yaml [--vm-limit 200]
 """
 import argparse
 import json
@@ -43,7 +43,7 @@ def load(path: Path, levels: list, vm_limit: int | None) -> dict:
     if vm_limit:
         vms = vms[:vm_limit]
     if not np.all(np.diff(ts) == 1):
-        raise ValueError("forecast origins are not contiguous; run msml612.evaluate with --stride 1")
+        raise ValueError("forecast origins are not contiguous; run shift_aware_forecasting.evaluate with --stride 1")
     V, T = len(vms), len(ts)
     keep = np.isin(vm, vms)
     vi, ti = np.searchsorted(vms, vm[keep]), np.searchsorted(ts, t[keep])
