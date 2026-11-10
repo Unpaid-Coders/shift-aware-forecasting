@@ -5,6 +5,9 @@ all in CPU %) so the online conformal wrapper can replay them in time order, plu
 metrics.json and a coverage-over-time plot.
 
   python -m shift_aware_forecasting.evaluate --run outputs/baseline_cpu_small [--stride 1] [--vm-limit 50]
+
+--data evaluates the same checkpoint on another copy of the data (for example one with injected
+shifts from shift_aware_forecasting.data.inject); --tag is appended to the output file names.
 """
 import argparse
 import json
@@ -44,6 +47,8 @@ def main() -> None:
     ap.add_argument("--stride", type=int, default=None)
     ap.add_argument("--vm-limit", type=int, default=None)
     ap.add_argument("--batch-size", type=int, default=512)
+    ap.add_argument("--data", type=Path, default=None, help="data file to evaluate on (default: the training config's)")
+    ap.add_argument("--tag", default=None, help="suffix for the output file names, e.g. shift_level")
     args = ap.parse_args()
 
     ck = torch.load(args.run / "best.pt", map_location="cpu", weights_only=False)
@@ -55,7 +60,7 @@ def main() -> None:
     model.to(device)
 
     vm_limit = args.vm_limit if args.vm_limit is not None else d.get("vm_limit", 0)
-    data = load_npz(d["path"], d["channels"], vm_limit, cfg["seed"])
+    data = load_npz(args.data or d["path"], d["channels"], vm_limit, cfg["seed"])
     x = data["x"]
     bounds = SplitSpec(d["train_days"], d["val_days"]).bounds(x.shape[1])
     tgt = d["channels"].index(d["target"])
@@ -82,7 +87,7 @@ def main() -> None:
             metrics[f"interval_{level}"] = m
     print(json.dumps({k: v for k, v in metrics.items()}, indent=1))
 
-    tag = f"{args.split}_s{stride}"
+    tag = f"{args.split}_s{stride}" + (f"_{args.tag}" if args.tag else "")
     np.savez_compressed(args.run / f"predictions_{tag}.npz", pred=pred.astype(np.float32),
                         y=y.astype(np.float32), vm=vm, t=t, observed=obs, quantiles=np.array(q),
                         vm_ids=data["vm_ids"], category=data["category"])

@@ -46,7 +46,7 @@ def aligned(values, obs, rel, lo, hi):
         return R, np.where(cnt > 0, acc / np.maximum(cnt, 1), np.nan), cnt
 
 
-def fig_shift_aligned(tr, sel, level, h, path, before_h=24, after_h=72, smooth_h=3):
+def fig_shift_aligned(tr, sel, level, h, path, label="a natural shift", before_h=24, after_h=72, smooth_h=3):
     import matplotlib.pyplot as plt
     ss = tr["shift_step"]
     pre = ss >= int(tr["pre_min_step"])      # VMs with >= 1 evaluated day before the shift
@@ -75,7 +75,7 @@ def fig_shift_aligned(tr, sel, level, h, path, before_h=24, after_h=72, smooth_h
     ax[1].set_xlabel("hours since the shift", fontsize=9, color="#52514e")
     ax[0].legend(loc="lower left", bbox_to_anchor=(0, 1.0), fontsize=8, frameon=False, ncol=5,
                  handlelength=1.5, columnspacing=1.2)
-    fig.suptitle(f"{level:.0%} interval (dashed: target), {h}-step ahead, {int(pre.sum())} VMs with a natural shift, "
+    fig.suptitle(f"{level:.0%} interval (dashed: target), {h}-step ahead, {int(pre.sum())} VMs with {label}, "
                  f"aligned at the shift", fontsize=10, x=0.02, ha="left", color="#0b0b0b")
     fig.tight_layout()
     fig.savefig(path, dpi=150)
@@ -109,10 +109,14 @@ def fig_over_time(tr, sel, level, path, h=1):
     plt.close(fig)
 
 
-def fig_by_horizon(metrics, sel, level, path):
+def fig_by_horizon(metrics, sel, level, path, label="a natural shift"):
     import matplotlib.pyplot as plt
-    fig, ax = plt.subplots(1, 2, figsize=(9, 3.8), sharey=True)
-    for a, g, title in zip(ax, ("tune", "shift"), ("VMs without a detected shift", "VMs with a natural shift")):
+    panels = [("tune", "VMs without a detected shift"), ("shift", f"VMs with {label}")]
+    panels = [p for p in panels if metrics["base"][p[0]]["per_horizon_coverage"] and
+              any(metrics["base"][p[0]]["per_horizon_coverage"])]
+    fig, ax = plt.subplots(1, len(panels), figsize=(4.5 * len(panels), 3.8), sharey=True, squeeze=False)
+    ax = ax[0]
+    for a, (g, title) in zip(ax, panels):
         for meth in ORDER:
             if meth not in sel:
                 continue
@@ -123,8 +127,9 @@ def fig_by_horizon(metrics, sel, level, path):
         a.set_xlabel("horizon (5-min steps)", fontsize=9, color="#52514e")
         _style(a)
     ax[0].set_ylabel("coverage", fontsize=9, color="#52514e")
-    fig.legend(*ax[0].get_legend_handles_labels(), loc="lower center", ncol=5, fontsize=8, frameon=False)
-    fig.tight_layout(rect=(0, 0.08, 1, 1))
+    ncol = 5 if len(panels) > 1 else 3
+    fig.legend(*ax[0].get_legend_handles_labels(), loc="lower center", ncol=ncol, fontsize=8, frameon=False)
+    fig.tight_layout(rect=(0, 0.08 if ncol == 5 else 0.14, 1, 1))
     fig.savefig(path, dpi=150)
     plt.close(fig)
 
@@ -132,9 +137,10 @@ def fig_by_horizon(metrics, sel, level, path):
 def summary_md(res) -> str:
     meta, out = res["meta"], []
     out.append(f"# Online conformal results\n\n{meta['n_vms']} VMs x {meta['n_steps']} test steps x "
-               f"{meta['horizons']} horizons. Shift VMs: {meta['n_shift_vms']} "
-               f"({meta['n_shift_vms_with_1d_before']} with at least 1 day of test data before the shift; "
-               f"before/after numbers use those). Hyperparameters were selected on the non-shift VMs only.\n")
+               f"{meta['horizons']} horizons. VMs with {meta.get('shift_label', 'a natural shift')}: "
+               f"{meta['n_shift_vms']} ({meta['n_shift_vms_with_1d_before']} with at least 1 evaluated day "
+               f"before the shift; before/after numbers use those). Method settings: "
+               f"{meta.get('selection', 'tuned on VMs without a detected shift')}.\n")
     for L, sel in res["selected"].items():
         out.append(f"\n## {L} interval\n")
         out.append("| method | config | coverage (all) | width (all) | local cov. error | coverage (shift VMs) "
@@ -158,15 +164,16 @@ def make_all(out: Path) -> None:
     import matplotlib
     matplotlib.use("Agg")
     res = json.load(open(out / "metrics.json"))
+    label = res["meta"].get("shift_label", "a natural shift")
     for L, sel in res["selected"].items():
         level = int(L.rstrip("%")) / 100
         tag = L.rstrip("%")
         tr = dict(np.load(out / f"traces_{tag}.npz"))
         for h in tr["plot_horizons"]:
             if f"shift_obs__h{h}" in tr and len(tr["shift_step"]):
-                fig_shift_aligned(tr, sel, level, int(h), out / f"fig_shift_aligned_{tag}_h{h}.png")
+                fig_shift_aligned(tr, sel, level, int(h), out / f"fig_shift_aligned_{tag}_h{h}.png", label)
         fig_over_time(tr, sel, level, out / f"fig_coverage_over_time_{tag}_h1.png")
-        fig_by_horizon(res["metrics"][L], sel, level, out / f"fig_coverage_by_horizon_{tag}.png")
+        fig_by_horizon(res["metrics"][L], sel, level, out / f"fig_coverage_by_horizon_{tag}.png", label)
     (out / "results.md").write_text(summary_md(res))
 
 

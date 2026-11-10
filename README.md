@@ -20,6 +20,7 @@ configs/            run configs (small CPU run, full Zaratan run)
 scripts/            fetch_azure2019.py -> build_dataset.py -> explore_data.py
 src/shift_aware_forecasting/
   data/windows.py   chronological splits + sliding windows
+  data/inject.py    controlled level / variance shifts in the test days
   models/           quantile_patchtst.py (ours) + patchtst/ (vendored, unmodified)
   conformal/        methods.py (ACI / quantile tracker / PID), run.py (sweep + shift evaluation), plots.py
   train.py          training loop (pinball loss, early stopping)
@@ -57,6 +58,8 @@ python -m shift_aware_forecasting.train --config configs/baseline_cpu_small.yaml
 python -m shift_aware_forecasting.evaluate --run outputs/baseline_cpu_small
 # 5. online conformal on the stride-1 test forecasts (CPU only; on Zaratan: slurm/conformal.sbatch)
 python -m shift_aware_forecasting.conformal.run --config configs/conformal_zaratan.yaml
+# 6. injected shifts (level, variance, both): inject, re-forecast, recalibrate (on Zaratan: slurm/injected_shifts.sbatch)
+python -m shift_aware_forecasting.data.inject --data data/azure2019_cpu_2000vm.npz --kind level --out data/injected
 ```
 
 ## Results so far

@@ -68,8 +68,15 @@ def load(path: Path, levels: list, vm_limit: int | None) -> dict:
 
 
 def shift_info(csv: Path, vm_ids: np.ndarray, min_score: float) -> np.ndarray:
-    """Shift time step per VM (-1 = no strong shift in the test days). Matched by VM id."""
+    """Shift time step per VM (-1 = no shift in the test days), matched by VM id.
+
+    Reads either the natural-shift scan (columns day, score: strong shifts at a day boundary) or
+    an injected-shift table from shift_aware_forecasting.data.inject (column shift_step).
+    """
     df = pd.read_csv(csv)
+    if "shift_step" in df.columns:
+        step = dict(zip(df.vm_id, df.shift_step))
+        return np.array([step.get(v, -1) for v in vm_ids], dtype=np.int64)
     df = df[(df.score > min_score) & (df.day >= TEST_START_DAY)]
     step = dict(zip(df.vm_id, df.day * STEPS_PER_DAY))
     return np.array([step.get(v, -1) for v in vm_ids], dtype=np.int64)
@@ -137,6 +144,10 @@ def main() -> None:
     ap.add_argument("--out", type=Path, default=None)
     ap.add_argument("--vm-limit", type=int, default=None, help="first N VMs only (quick test)")
     ap.add_argument("--workers", type=int, default=None)
+    ap.add_argument("--shift-csv", type=Path, default=None, help="override shift_csv from the config")
+    ap.add_argument("--shift-label", default=None, help="how figures describe the shift, e.g. 'an injected level shift'")
+    ap.add_argument("--selected", type=Path, default=None,
+                    help="selected.json from an earlier run: reuse its settings instead of tuning on this data")
     args = ap.parse_args()
     cfg = yaml.safe_load(open(args.config))
     pred_path = args.predictions or Path(cfg["predictions"])
@@ -145,7 +156,8 @@ def main() -> None:
     levels = cfg["levels"]
     t0 = time.time()
     data = load(pred_path, levels, args.vm_limit)
-    shift_step = shift_info(Path(cfg["shift_csv"]), data["vm_ids"], cfg["shift_min_score"])
+    shift_step = shift_info(args.shift_csv or Path(cfg["shift_csv"]), data["vm_ids"], cfg["shift_min_score"])
+    fixed = json.load(open(args.selected)) if args.selected else None
     V, H, T = data["y"].shape
     print(f"loaded {V} VMs x {H} horizons x {T} steps in {time.time() - t0:.0f}s; "
           f"{(shift_step >= 0).sum()} shift VMs", flush=True)
@@ -194,14 +206,16 @@ def main() -> None:
         table = pd.DataFrame(rows)
         table.to_csv(out / f"table_{L.rstrip('%')}.csv", index=False)
         pd.DataFrame(srows).to_csv(out / f"shift_table_{L.rstrip('%')}.csv", index=False)
-        # selection on the tuning VMs only
-        tune = table[table.group == "tune"].copy()
-        sel = {"base": "base"}
-        for meth in [m for m in cfg["methods"]]:
-            cand = tune[tune.method == meth].copy()
-            cand["gap"] = (cand.coverage - lv).abs()
-            ok = cand[cand.gap <= cfg["coverage_tolerance"]]
-            sel[meth] = (ok.sort_values("width") if len(ok) else cand.sort_values("gap")).iloc[0].config
+        if fixed is not None:          # settings chosen on another run (e.g. the clean data)
+            sel = fixed[L]
+        else:                          # selection on the tuning VMs only
+            tune = table[table.group == "tune"].copy()
+            sel = {"base": "base"}
+            for meth in cfg["methods"]:
+                cand = tune[tune.method == meth].copy()
+                cand["gap"] = (cand.coverage - lv).abs()
+                ok = cand[cand.gap <= cfg["coverage_tolerance"]]
+                sel[meth] = (ok.sort_values("width") if len(ok) else cand.sort_values("gap")).iloc[0].config
         selected[L] = sel
         # traces for figures
         sel_names = list(dict.fromkeys(sel.values()))
@@ -223,11 +237,14 @@ def main() -> None:
             "n_shift_vms": int((shift_step >= 0).sum()),
             "n_shift_vms_with_1d_before": int((shift_step >= pre_min).sum()),
             "eval_start_day": eval_start / STEPS_PER_DAY,
+            "n_tune_vms": int((shift_step < 0).sum()),
+            "selection": f"reused from {args.selected}" if args.selected else "tuned on VMs without a detected shift",
+            "shift_label": args.shift_label or cfg.get("shift_label", "a natural shift"),
             "config": cfg, "runtime_s": round(time.time() - t0)}
     json.dump({"meta": meta, "selected": selected, "metrics": metrics}, open(out / "metrics.json", "w"), indent=1)
     json.dump(selected, open(out / "selected.json", "w"), indent=1)
     for L, sel in selected.items():
-        print(f"\n{L} interval (selected on tune VMs; coverage / width)")
+        print(f"\n{L} interval (coverage / width; settings {meta['selection']})")
         for meth, n in sel.items():
             m = metrics[L][n]
             sw = m["shift_windows"]
