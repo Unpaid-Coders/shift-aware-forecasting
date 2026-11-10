@@ -8,9 +8,9 @@ their coverage after a distribution shift.
   See [docs/dataset.md](docs/dataset.md).
 - **Baseline:** PatchTST (Nie et al., ICLR 2023) with a non-crossing multi-quantile head,
   trained with pinball loss. Vendored from the official repo (Apache-2.0).
-- **Contribution (next phase):** online conformal wrappers (ACI, quantile tracking,
-  conformal PID) from `aangelopoulos/conformal-time-series` (MIT) applied to the
-  baseline's own quantiles (CQR scores). See [docs/implementations.md](docs/implementations.md).
+- **Contribution:** online conformal wrappers (ACI, quantile tracking,
+  conformal PID) adapted from `aangelopoulos/conformal-time-series` (MIT) and applied to the
+  baseline's own quantiles (CQR scores), evaluated on VMs with natural shifts in the test days. See [docs/implementations.md](docs/implementations.md).
 - **Citations:** [CITATIONS.bib](CITATIONS.bib).
 
 ## Layout
@@ -21,7 +21,7 @@ scripts/            fetch_azure2019.py -> build_dataset.py -> explore_data.py
 src/msml612/
   data/windows.py   chronological splits + sliding windows
   models/           quantile_patchtst.py (ours) + patchtst/ (vendored, unmodified)
-  conformal/        online conformal wrappers (next phase)
+  conformal/        methods.py (ACI / quantile tracker / PID), run.py (sweep + shift evaluation), plots.py
   train.py          training loop (pinball loss, early stopping)
   evaluate.py       test metrics, rolling forecasts for the conformal phase, coverage plot
   metrics.py
@@ -55,6 +55,8 @@ python scripts/explore_data.py --data data/azure2019_cpu_2000vm.npz --out docs/e
 # 4. baseline (set PYTHONPATH=src)
 python -m msml612.train --config configs/baseline_cpu_small.yaml
 python -m msml612.evaluate --run outputs/baseline_cpu_small
+# 5. online conformal on the stride-1 test forecasts (CPU only; on Zaratan: slurm/conformal.sbatch)
+python -m msml612.conformal.run --config configs/conformal_zaratan.yaml
 ```
 
 ## Results so far

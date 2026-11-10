@@ -1,0 +1,20 @@
+# Online conformal calibration of the quantile PatchTST baseline (CPU only).
+# python -m msml612.conformal.run --config configs/conformal_zaratan.yaml
+predictions: outputs/baseline_zaratan/predictions_test_s1.npz
+out_dir: outputs/conformal_zaratan
+shift_csv: docs/eda/shift_candidates.csv
+shift_min_score: 2.0         # same threshold as scripts/explore_data.py (70 VMs in test days 21-30)
+levels: [0.9, 0.8, 0.5]      # interval levels; each needs quantiles (1-level)/2 and (1+level)/2
+window: 288                  # trailing score window (1 day of 5-min steps) for ACI/trail and step-size scaling
+burnin_days: 1               # first test day (21) warms the methods up; metrics use days 22-30
+coverage_tolerance: 0.01     # selection: |coverage - level| <= this on the tuning VMs, then smallest width
+plot_horizons: [1, 6, 12]    # horizons (1-based) whose per-VM traces are saved and plotted
+workers: 8
+# Hyperparameter sweep. Every config is run; one per method is selected on the VMs WITHOUT a
+# detected shift, and the shift figures/tables use only the held-out shift VMs.
+methods:
+  trail: [{}]
+  aci:  [{lr: 0.001}, {lr: 0.005}, {lr: 0.01}, {lr: 0.05}]
+  qt:   [{lr: 0.005}, {lr: 0.01}, {lr: 0.05}, {lr: 0.1}]
+  pid:  [{lr: 0.01, ki: 0.05}, {lr: 0.01, ki: 0.2}, {lr: 0.01, ki: 1.0},
+         {lr: 0.05, ki: 0.05}, {lr: 0.05, ki: 0.2}, {lr: 0.05, ki: 1.0}]
