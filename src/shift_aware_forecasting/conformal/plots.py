@@ -46,7 +46,7 @@ def aligned(values, obs, rel, lo, hi):
         return R, np.where(cnt > 0, acc / np.maximum(cnt, 1), np.nan), cnt
 
 
-def fig_shift_aligned(tr, sel, level, h, path, before_h=24, after_h=72):
+def fig_shift_aligned(tr, sel, level, h, path, before_h=24, after_h=72, smooth_h=3):
     import matplotlib.pyplot as plt
     ss = tr["shift_step"]
     pre = ss >= int(tr["pre_min_step"])      # VMs with >= 1 evaluated day before the shift
@@ -64,13 +64,13 @@ def fig_shift_aligned(tr, sel, level, h, path, before_h=24, after_h=72):
         _, w, _ = aligned(wid[pre], obs[pre], rel[pre], lo, hi)
         hours = R / 12
         lw = 1.2 if meth == "base" else 1.6
-        ax[0].plot(hours, smooth(c, 12), color=COLORS[meth], lw=lw, label=METHOD_LABELS[meth])
-        ax[1].plot(hours, smooth(w, 12), color=COLORS[meth], lw=lw)
+        ax[0].plot(hours, smooth(c, 12 * smooth_h), color=COLORS[meth], lw=lw, label=METHOD_LABELS[meth])
+        ax[1].plot(hours, smooth(w, 12 * smooth_h), color=COLORS[meth], lw=lw)
     ax[0].axhline(level, color="#0b0b0b", ls="--", lw=0.9)
     for a in ax:
         a.axvline(0, color="#52514e", lw=0.9, ls=":")
         _style(a)
-    ax[0].set_ylabel("coverage (1-hour mean)", fontsize=9, color="#52514e")
+    ax[0].set_ylabel(f"coverage ({smooth_h}-hour mean)", fontsize=9, color="#52514e")
     ax[1].set_ylabel("interval width (CPU %)", fontsize=9, color="#52514e")
     ax[1].set_xlabel("hours since the shift", fontsize=9, color="#52514e")
     ax[0].legend(loc="lower left", bbox_to_anchor=(0, 1.0), fontsize=8, frameon=False, ncol=5,
@@ -84,14 +84,18 @@ def fig_shift_aligned(tr, sel, level, h, path, before_h=24, after_h=72):
 
 def fig_over_time(tr, sel, level, path, h=1):
     import matplotlib.pyplot as plt
-    days = (tr["ts"] + h - 1) / STEPS_PER_DAY
+    target_t = tr["ts"] + h - 1
+    keep = target_t >= int(tr["eval_start"])          # the burn-in day is not evaluated
+    days = target_t[keep] / STEPS_PER_DAY
     fig, ax = plt.subplots(2, 1, figsize=(10, 5), sharex=True)
     for meth in ORDER:
         if meth not in sel:
             continue
         n = sel[meth]
-        ax[0].plot(days, smooth(tr[f"time_cov__{n}"][h - 1], 12), color=COLORS[meth], lw=1.1, label=METHOD_LABELS[meth])
-        ax[1].plot(days, smooth(tr[f"time_wid__{n}"][h - 1], 12), color=COLORS[meth], lw=1.1)
+        cov = smooth(tr[f"time_cov__{n}"][h - 1][keep], 12)
+        wid = smooth(tr[f"time_wid__{n}"][h - 1][keep], 12)
+        ax[0].plot(days, cov, color=COLORS[meth], lw=1.1, label=METHOD_LABELS[meth])
+        ax[1].plot(days, wid, color=COLORS[meth], lw=1.1)
     ax[0].axhline(level, color="#0b0b0b", ls="--", lw=0.9)
     for a in ax:
         _style(a)
