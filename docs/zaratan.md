@@ -1,8 +1,7 @@
 # What runs locally vs. on Zaratan
 
-This laptop has 22 logical CPUs, 15 GB RAM and no CUDA GPU, so it is fine for data prep,
-debugging and small CPU runs, but the full-size baseline and the experiment sweeps belong
-on Zaratan.
+A typical development laptop (no CUDA GPU) is fine for data preparation, debugging and
+small CPU runs; the full-size baseline and the experiment sweeps run on the UMD Zaratan cluster.
 
 | Step | Where | Why |
 |---|---|---|
@@ -11,17 +10,20 @@ on Zaratan.
 | `configs/baseline_cpu_small.yaml` (200 VMs, d_model 64) | local | Debugging and quick sanity numbers, tens of minutes on CPU. |
 | `configs/baseline_zaratan.yaml` (all VMs, paper-sized PatchTST, stride-1 windows) | **Zaratan GPU** | ~15M training windows per pass; hours on one GPU, impractical on CPU. `slurm/train_baseline.sbatch`. |
 | `evaluate --stride 1` on the full model | **Zaratan GPU** | Rolling test forecasts for every VM and step (input to the conformal phase). |
-| Online conformal replay (ACI / quantile tracker / PID over saved forecasts) | local or Zaratan CPU | Cheap numpy loops over `predictions_test_s1.npz`; parallelise per VM if slow. |
+| Online conformal replay (ACI / quantile tracker / PID over saved forecasts) | local or Zaratan CPU | Vectorised over VMs, a few minutes on 4-8 cores. `slurm/conformal.sbatch` (CPU partition). |
 | Seeds x shift types x conformal methods sweep, extra baselines (vanilla Transformer, EnbPI) | **Zaratan** (job array) | Many independent runs. |
 
 ## Setup on Zaratan
 
 ```bash
-module load python   # check `module avail` for a recent Python / CUDA
-python -m venv ~/venvs/msml612 && source ~/venvs/msml612/bin/activate
+module load python
+python -m venv .venv && source .venv/bin/activate   # the sbatch scripts activate the repo's .venv
 pip install torch            # CUDA build
 pip install -r requirements.txt
+mkdir -p logs                # Slurm does not create the log folder
 ```
 
-Fill in `--account` in `slurm/*.sbatch` with the class allocation and check the GPU
-partition and `--gres` names with `sinfo`; both are placeholders.
+The scripts use the class allocation (`--account=msml612-class`). GPU jobs must name the GPU
+type (`--gres=gpu:a100:1`); a plain `gpu:1` is rejected. Each job appends a START and a
+DONE/FAIL line to `logs/job_history.log`. To get e-mail notifications, add
+`--mail-type=BEGIN,END,FAIL --mail-user=<your e-mail>` to the `sbatch` command.
