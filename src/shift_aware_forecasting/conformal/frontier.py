@@ -6,7 +6,7 @@ panels per run:
   left   local coverage error (mean |daily per-VM coverage - target|) against average width
   right  coverage in the day after the shift against average width in that day (dashed: target)
 Settings that are better sit lower-left (left panel) or higher-left (right panel). Points of a
-method are joined in order of width. ACI and QT points are labelled with their step size; PID points
+method are joined in order of width (PID points are not joined: its step size x gain grid has no order). ACI and QT points are labelled with their step size; PID points
 are left unlabelled because at equal step size they sit on top of QT's. The base quantiles are far
 outside the plotted range, so their values are written in the panel corner instead of plotted.
 
@@ -62,7 +62,8 @@ def fig_frontier(runs: list, level: str, path: Path) -> None:
                            ha="right", va="bottom" if y == "coverage_after_1d" else "top", fontsize=7.5,
                            color=COLORS["base"])
                     continue
-                a.plot(m[x], m[y], color=COLORS[meth], lw=1.4, marker="o", ms=4.5,
+                # PID's grid (step size x integrator gain) has no natural order, so no joining line
+                a.plot(m[x], m[y], color=COLORS[meth], lw=0 if meth == "pid" else 1.4, marker="o", ms=4.5,
                        label=METHOD_LABELS[meth] if (r, a) == (0, ax[0, 0]) else None)
                 if meth in ("aci", "qt"):
                     for cfg, row in m.iterrows():
