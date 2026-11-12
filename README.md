@@ -64,7 +64,7 @@ python -m shift_aware_forecasting.data.inject --data data/azure2019_cpu_2000vm.n
 
 ## Results so far
 
-See [docs/baseline_results.md](docs/baseline_results.md).
+See [docs/baseline_results.md](docs/baseline_results.md) (baseline) and [docs/injected_shift_results.md](docs/injected_shift_results.md) (online conformal under injected shifts).
 
 ## What runs where
 
