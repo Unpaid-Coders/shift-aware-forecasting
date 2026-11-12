@@ -110,6 +110,9 @@ What the sweep shows:
   ACI lr 0.005 reaches 0.903 after the shift at width 11.43, against 0.886 for QT lr 0.01 at 10.99.
 - **The trailing window is dominated by everything else.**
 
+Figure: `outputs/frontier/frontier_90.png` and `frontier_80.png`, from
+`python -m shift_aware_forecasting.conformal.frontier` (see its docstring for the command).
+
 So there is a real trade-off. QT/PID spread their width evenly and give the most even coverage.
 ACI with a larger step size spends width on the hours after a shift and recovers faster.
 "Which method is best" depends on whether the goal is even calibration or fast recovery.
