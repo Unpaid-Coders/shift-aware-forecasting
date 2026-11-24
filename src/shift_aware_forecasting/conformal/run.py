@@ -20,6 +20,10 @@ into the validation days, where every VM is shifted): per method, the smallest w
 whose coverage is within coverage_tolerance of the target both overall and in the day after the
 shift, else the config with the smallest of the two gaps. The burn-in starts at the first forecast
 origin, so the same code runs on validation (day 18) and test (day 21) predictions.
+
+--split-offsets adds the offline split-conformal baselines `split` and `split_vm` (fixed offsets
+calibrated on the validation days by conformal.split). They have no settings to tune, so they are
+always part of the selection and appear in every table and figure.
 """
 import argparse
 import json
@@ -35,6 +39,7 @@ STEPS_PER_DAY = 288  # 5-minute readings (same as data/windows.py; not imported 
 from .methods import MethodConfig, cqr_scores, online_offsets
 
 TEST_START_DAY = 21
+SPLIT_METHODS = ("split", "split_vm")
 G = {}  # data shared with forked workers
 
 
@@ -104,6 +109,10 @@ def work(task):
     t0 = time.time()
     qs = online_offsets(s, 1 - lv, h + 1, G["configs"], cfg["window"], lower=-(hi - lo) / 2)
     qs = {"base": np.zeros_like(s), **qs}
+    if G.get("split") is not None:   # fixed offsets from the validation days, same lower clip as the online methods
+        lower = -(hi - lo) / 2
+        qs["split"] = np.maximum(np.full_like(s, G["split"]["global"][li, h]), lower)
+        qs["split_vm"] = np.maximum(np.broadcast_to(G["split"]["vm"][li, :, h][:, None], s.shape), lower)
     day = tt // STEPS_PER_DAY
     days = np.unique(day[tt >= G["eval_start"]])
     shift_step = G["shift_step"]
@@ -157,6 +166,8 @@ def main() -> None:
                     help="VM group used to pick one setting per method (see the module docstring)")
     ap.add_argument("--selected", type=Path, default=None,
                     help="selected.json from an earlier run: reuse its settings instead of tuning on this data")
+    ap.add_argument("--split-offsets", type=Path, default=None,
+                    help="split_offsets.npz from conformal.split: also evaluate the offline split-conformal baselines")
     args = ap.parse_args()
     cfg = yaml.safe_load(open(args.config))
     pred_path = args.predictions or Path(cfg["predictions"])
@@ -171,12 +182,25 @@ def main() -> None:
     print(f"loaded {V} VMs x {H} horizons x {T} steps in {time.time() - t0:.0f}s; "
           f"{(shift_step >= 0).sum()} shift VMs", flush=True)
     configs = build_configs(cfg)
+    split = None
+    if args.split_offsets:
+        so = np.load(args.split_offsets)
+        li_of = [int(np.argmin(np.abs(so["levels"] - lv))) for lv in levels]
+        if not np.allclose(so["levels"][li_of], levels):
+            raise ValueError(f"{args.split_offsets} has levels {so['levels']}, need {levels}")
+        pos = {v: i for i, v in enumerate(so["vm_ids"])}
+        row = np.array([pos.get(v, -1) for v in data["vm_ids"]])
+        q_vm = so["q_vm"][li_of][:, np.maximum(row, 0)]
+        q_vm[:, row < 0] = so["q_global"][li_of][:, None, :]     # VM not in the calibration data
+        split = {"global": so["q_global"][li_of], "vm": q_vm}
+        print(f"split-conformal offsets from {args.split_offsets} ({(row < 0).sum()} VMs use the pooled offset)")
     start_day = int(data["ts"].min()) // STEPS_PER_DAY      # 21 for test predictions, 18 for validation
     if args.burnin_days is not None:
         cfg["burnin_days"] = args.burnin_days
     eval_start = int((start_day + cfg.get("burnin_days", 0)) * STEPS_PER_DAY)
     pre_min = eval_start + STEPS_PER_DAY
-    G.update(data, levels=levels, cfg=cfg, configs=configs, shift_step=shift_step, eval_start=eval_start)
+    G.update(data, levels=levels, cfg=cfg, configs=configs, shift_step=shift_step, eval_start=eval_start,
+             split=split)
     tasks = [(li, h) for li in range(len(levels)) for h in range(H)]
     workers = args.workers or cfg.get("workers", 1)
     if workers > 1:
@@ -185,8 +209,9 @@ def main() -> None:
     else:
         results = dict(map(work, tasks))
 
-    names = ["base"] + [c.name for c in configs]
-    method_of = {"base": "base", **{c.name: c.method for c in configs}}
+    extra = list(SPLIT_METHODS) if split is not None else []
+    names = ["base"] + extra + [c.name for c in configs]
+    method_of = {"base": "base", **{m: m for m in extra}, **{c.name: c.method for c in configs}}
     metrics, selected = {}, {}
     for li, lv in enumerate(levels):
         L = level_name(lv)
@@ -237,6 +262,7 @@ def main() -> None:
                 cand["gap"] = (cand.coverage - lv).abs()
                 ok = cand[cand.gap <= cfg["coverage_tolerance"]]
                 sel[meth] = (ok.sort_values("width") if len(ok) else cand.sort_values("gap")).iloc[0].config
+        sel = {"base": "base", **{m: m for m in extra}, **{k: v for k, v in sel.items() if k not in SPLIT_METHODS}}
         selected[L] = sel
         # traces for figures
         sel_names = list(dict.fromkeys(sel.values()))
@@ -263,6 +289,7 @@ def main() -> None:
                           "tuned on the shift VMs (overall and day-after coverage)" if args.select_on == "shift"
                           else "tuned on VMs without a detected shift"),
             "shift_label": args.shift_label or cfg.get("shift_label", "a natural shift"),
+            "split_offsets": str(args.split_offsets) if args.split_offsets else None,
             "config": cfg, "runtime_s": round(time.time() - t0)}
     json.dump({"meta": meta, "selected": selected, "metrics": metrics}, open(out / "metrics.json", "w"), indent=1)
     json.dump(selected, open(out / "selected.json", "w"), indent=1)
@@ -271,7 +298,7 @@ def main() -> None:
         for meth, n in sel.items():
             m = metrics[L][n]
             sw = m["shift_windows"]
-            print(f"  {meth:6s} {n:22s} all {m['all']['coverage']:.3f}/{m['all']['width']:.2f}  "
+            print(f"  {meth:8s} {n:22s} all {m['all']['coverage']:.3f}/{m['all']['width']:.2f}  "
                   f"shift {m['shift']['coverage']:.3f}/{m['shift']['width']:.2f}  "
                   f"before {sw['before_1d']['coverage']:.3f} after1d {sw['after_1d']['coverage']:.3f}  "
                   f"local err {m['all']['local_coverage_error']:.3f}")

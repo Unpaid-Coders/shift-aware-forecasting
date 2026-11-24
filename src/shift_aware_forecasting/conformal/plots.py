@@ -12,8 +12,9 @@ STEPS_PER_DAY = 288  # 5-minute readings (same as data/windows.py; not imported 
 from .methods import METHOD_LABELS
 
 # Fixed categorical order (base model in neutral gray).
-COLORS = {"base": "#8a8984", "aci": "#2a78d6", "pid": "#eb6834", "qt": "#1baf7a", "trail": "#eda100"}
-ORDER = ["base", "trail", "aci", "qt", "pid"]
+COLORS = {"base": "#8a8984", "aci": "#2a78d6", "pid": "#eb6834", "qt": "#1baf7a", "trail": "#eda100",
+          "split": "#6b4fbb", "split_vm": "#b04fa0"}
+ORDER = ["base", "split", "split_vm", "trail", "aci", "qt", "pid"]
 
 
 def _style(ax):

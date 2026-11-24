@@ -38,7 +38,8 @@ from dataclasses import dataclass
 import numpy as np
 
 METHOD_LABELS = {"base": "Base quantiles", "trail": "Trailing split CP", "aci": "ACI",
-                 "qt": "Quantile tracker", "pid": "Conformal PID"}
+                 "qt": "Quantile tracker", "pid": "Conformal PID",
+                 "split": "Split CP (pooled)", "split_vm": "Split CP (per VM)"}
 
 
 @dataclass(frozen=True)
