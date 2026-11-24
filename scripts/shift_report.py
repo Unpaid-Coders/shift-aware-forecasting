@@ -6,14 +6,16 @@ shift, and coverage/width in hour bins aligned to the shift (from traces_<level>
 Run from the repo root on the machine that has outputs/:
 
   python scripts/shift_report.py | tee logs/shift_report.txt
+  python scripts/shift_report.py scale scale_x1.5   # only the listed shift kinds/suffixes
 """
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
 
 RUN = Path("outputs/baseline_zaratan")
-KINDS = ["level", "scale", "level_scale"]
+KINDS = sys.argv[1:] or ["level", "scale", "level_scale"]
 BINS = [(-24, 0), (0, 1), (1, 3), (3, 6), (6, 12), (12, 24), (24, 48), (48, 72)]  # hours since shift
 
 print("##### base forecaster (median + raw quantile intervals), clean vs injected")

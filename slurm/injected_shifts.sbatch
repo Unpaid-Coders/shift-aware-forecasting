@@ -28,16 +28,18 @@ export PYTHONPATH=$PWD/src
 
 RUN=${RUN:-outputs/baseline_zaratan}
 KINDS=${KINDS:-"level scale level_scale"}
+SCALE=${SCALE:-3.0}   # variance factor for scale/level_scale
+SUFFIX=${SUFFIX:-}    # appended to data/output names, e.g. _x1.5, so runs do not overwrite each other
 declare -A LABEL=([level]="an injected level shift" [scale]="an injected variance shift"
                   [level_scale]="an injected level and variance shift")
 for KIND in $KINDS; do
     echo "=== $KIND ==="
-    python -m shift_aware_forecasting.data.inject --data data/azure2019_cpu_2000vm.npz --kind "$KIND" \
-        --out data/injected
-    python -m shift_aware_forecasting.evaluate --run "$RUN" --stride 1 --tag "shift_$KIND" \
-        --data "data/injected/azure2019_cpu_2000vm_$KIND.npz"
+    python -m shift_aware_forecasting.data.inject --data data/azure2019_cpu_2000vm.npz --kind "$KIND" --scale "$SCALE" \
+        --out "data/injected$SUFFIX"
+    python -m shift_aware_forecasting.evaluate --run "$RUN" --stride 1 --tag "shift_$KIND$SUFFIX" \
+        --data "data/injected$SUFFIX/azure2019_cpu_2000vm_$KIND.npz"
     python -m shift_aware_forecasting.conformal.run --config configs/conformal_zaratan.yaml \
-        --predictions "$RUN/predictions_test_s1_shift_$KIND.npz" --out "outputs/conformal_shift_$KIND" \
-        --shift-csv "data/injected/shifts_$KIND.csv" --selected outputs/conformal_zaratan/selected.json \
+        --predictions "$RUN/predictions_test_s1_shift_$KIND$SUFFIX.npz" --out "outputs/conformal_shift_$KIND$SUFFIX" \
+        --shift-csv "data/injected$SUFFIX/shifts_$KIND.csv" --selected outputs/conformal_zaratan/selected.json \
         --shift-label "${LABEL[$KIND]}" --workers "${SLURM_CPUS_PER_TASK:-8}"
 done

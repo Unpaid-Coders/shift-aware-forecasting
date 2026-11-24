@@ -14,6 +14,12 @@ Outputs in out_dir: metrics.json, selected.json, table_<level>.csv (all configs,
 shift_table_<level>.csv (before/after shift), traces_<level>.npz, and figures (plots.py).
 
   python -m shift_aware_forecasting.conformal.run --config configs/conformal_zaratan.yaml [--vm-limit 200]
+
+--select-on shift picks the settings on the shift VMs instead (for predictions with a shift injected
+into the validation days, where every VM is shifted): per method, the smallest width among the configs
+whose coverage is within coverage_tolerance of the target both overall and in the day after the
+shift, else the config with the smallest of the two gaps. The burn-in starts at the first forecast
+origin, so the same code runs on validation (day 18) and test (day 21) predictions.
 """
 import argparse
 import json
@@ -146,6 +152,9 @@ def main() -> None:
     ap.add_argument("--workers", type=int, default=None)
     ap.add_argument("--shift-csv", type=Path, default=None, help="override shift_csv from the config")
     ap.add_argument("--shift-label", default=None, help="how figures describe the shift, e.g. 'an injected level shift'")
+    ap.add_argument("--burnin-days", type=float, default=None, help="override burnin_days from the config")
+    ap.add_argument("--select-on", choices=("tune", "shift"), default="tune",
+                    help="VM group used to pick one setting per method (see the module docstring)")
     ap.add_argument("--selected", type=Path, default=None,
                     help="selected.json from an earlier run: reuse its settings instead of tuning on this data")
     args = ap.parse_args()
@@ -162,7 +171,10 @@ def main() -> None:
     print(f"loaded {V} VMs x {H} horizons x {T} steps in {time.time() - t0:.0f}s; "
           f"{(shift_step >= 0).sum()} shift VMs", flush=True)
     configs = build_configs(cfg)
-    eval_start = int((TEST_START_DAY + cfg.get("burnin_days", 0)) * STEPS_PER_DAY)
+    start_day = int(data["ts"].min()) // STEPS_PER_DAY      # 21 for test predictions, 18 for validation
+    if args.burnin_days is not None:
+        cfg["burnin_days"] = args.burnin_days
+    eval_start = int((start_day + cfg.get("burnin_days", 0)) * STEPS_PER_DAY)
     pre_min = eval_start + STEPS_PER_DAY
     G.update(data, levels=levels, cfg=cfg, configs=configs, shift_step=shift_step, eval_start=eval_start)
     tasks = [(li, h) for li in range(len(levels)) for h in range(H)]
@@ -208,6 +220,15 @@ def main() -> None:
         pd.DataFrame(srows).to_csv(out / f"shift_table_{L.rstrip('%')}.csv", index=False)
         if fixed is not None:          # settings chosen on another run (e.g. the clean data)
             sel = fixed[L]
+        elif args.select_on == "shift":  # coverage overall and in the day after the shift, then width
+            sel = {"base": "base"}
+            for meth in cfg["methods"]:
+                cand = [n for n in names if method_of[n] == meth]
+                gap = {n: max(abs(metrics[L][n]["shift"]["coverage"] - lv),
+                              abs(metrics[L][n]["shift_windows"]["after_1d"]["coverage"] - lv)) for n in cand}
+                ok = [n for n in cand if gap[n] <= cfg["coverage_tolerance"]]
+                sel[meth] = (min(ok, key=lambda n: metrics[L][n]["shift"]["width"]) if ok
+                             else min(cand, key=gap.get))
         else:                          # selection on the tuning VMs only
             tune = table[table.group == "tune"].copy()
             sel = {"base": "base"}
@@ -238,7 +259,9 @@ def main() -> None:
             "n_shift_vms_with_1d_before": int((shift_step >= pre_min).sum()),
             "eval_start_day": eval_start / STEPS_PER_DAY,
             "n_tune_vms": int((shift_step < 0).sum()),
-            "selection": f"reused from {args.selected}" if args.selected else "tuned on VMs without a detected shift",
+            "selection": (f"reused from {args.selected}" if args.selected else
+                          "tuned on the shift VMs (overall and day-after coverage)" if args.select_on == "shift"
+                          else "tuned on VMs without a detected shift"),
             "shift_label": args.shift_label or cfg.get("shift_label", "a natural shift"),
             "config": cfg, "runtime_s": round(time.time() - t0)}
     json.dump({"meta": meta, "selected": selected, "metrics": metrics}, open(out / "metrics.json", "w"), indent=1)
