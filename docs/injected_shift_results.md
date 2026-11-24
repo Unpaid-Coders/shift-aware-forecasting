@@ -123,6 +123,52 @@ Base coverage barely moves across these shifts (day before 0.857, day after 0.85
 traces are noisy with no clear dip. The natural shifts in the trace are mild *for this model*, so
 they show the calibration fix (0.86 -> 0.90, local error 0.06 -> 0.01) but not shift recovery.
 
+## 5. Validation-selected settings and a milder (1.5x) variance shift
+
+Zaratan jobs 24078050 (`KINDS=scale SCALE=1.5 SUFFIX=_x1.5 slurm/injected_shifts.sbatch`, 12 min)
+and 24078074 (`slurm/val_selection.sbatch`, 20 min), 2026-11-15. The selection run injects a 3x
+variance shift at a random step in validation day 19.5-20 for every VM, forecasts the validation
+split with the same checkpoint, and uses day 18.0-18.5 as the conformal burn-in. Per method it keeps
+the smallest-width setting whose coverage is within 1 pp of target both overall and in the day after
+the shift (`conformal.run --select-on shift`). Those settings are then applied unchanged to the test
+data. Full numbers: `python scripts/shift_report.py scale_val scale scale_valsel scale_x1.5
+scale_x1.5_valsel` (saved on Zaratan as `logs/shift_report_valsel.txt`).
+
+Selected settings at 90%: ACI lr 0.005, QT lr 0.05, PID lr 0.05 / ki 0.05 (80% and 50%: ACI lr 0.01,
+QT lr 0.05, PID lr 0.01 / ki 1). The clean-data selection was ACI 0.001, QT 0.005, PID 0.01 / 0.05.
+
+90% interval on the test days, coverage / mean width (all horizons):
+
+| method, selection | clean overall | 3x overall | 3x day after | 1.5x overall | 1.5x day after |
+|---|---|---|---|---|---|
+| base | 0.851 / 5.28 | 0.820 / 9.20 | 0.630 | 0.834 / 6.48 | 0.736 |
+| ACI, clean | 0.900 / 5.97 | 0.899 / 11.32 | 0.844 | 0.900 / 7.58 | 0.872 |
+| QT, clean | 0.900 / 5.95 | 0.896 / 10.91 | 0.842 | 0.899 / 7.47 | 0.878 |
+| PID, clean | 0.900 / 6.19 | 0.897 / 11.33 | 0.866 | 0.899 / 7.76 | 0.888 |
+| ACI, validation | 0.901 / 6.19 | 0.901 / 11.87 | 0.891 | 0.901 / 7.87 | 0.893 |
+| QT, validation | 0.901 / 8.48 | 0.900 / 15.39 | 0.889 | 0.901 / 10.55 | 0.898 |
+| PID, validation | 0.901 / 8.50 | 0.900 / 15.42 | 0.889 | 0.901 / 10.57 | 0.898 |
+
+Horizon 1, 3x shift, validation-selected settings, coverage by hours since the shift:
+
+| method | day before | 0-1 h | 1-3 h | 3-6 h | 6-12 h | 12-24 h | 24-48 h |
+|---|---|---|---|---|---|---|---|
+| base | 0.863 / 4.3 | 0.363 | 0.489 | 0.558 | 0.631 | 0.715 | 0.832 |
+| ACI lr 0.005 | 0.900 / 4.8 | 0.420 | 0.727 | 0.884 | 0.924 | 0.943 | 0.924 |
+| QT lr 0.05 | 0.900 / 5.2 | **0.667** | **0.876** | 0.905 | 0.905 | 0.903 | 0.902 |
+| PID lr 0.05, ki 0.05 | 0.900 / 5.2 | 0.668 | 0.876 | 0.905 | 0.905 | 0.903 | 0.902 |
+
+- **Validation-selected ACI is the best overall choice.** Compared with clean selection, it costs
+  about 4-5% more width (clean 6.19 vs 5.97, 1.5x 7.87 vs 7.58), lowers local error on clean data
+  (0.016 vs 0.019) and lifts day-after coverage to 0.89 at both shift sizes.
+- **Validation-selected QT/PID recover fastest at horizon 1** (0.67 in the first hour and 0.88 in
+  hours 1-3, against 0.42 and 0.73 for ACI) and never overshoot, but their larger step costs about
+  40% more width everywhere, including on clean data (8.48 vs 6.19). ACI overshoots to 0.94 about
+  12-24 h after the shift.
+- **The selection transfers across shift sizes.** Settings tuned on a 3x validation shift are
+  also near target in the day after a 1.5x test shift, without over-widening (ACI +4%).
+- PID again matches QT at the same step size.
+
 ## What this means for the paper
 
 1. **The recovery story is variance shifts.** The base model handles level shifts by design
@@ -140,8 +186,8 @@ they show the calibration fix (0.86 -> 0.90, local error 0.06 -> 0.01) but not s
    of one setting per method.
 5. **The integrator adds little.** PID ≈ QT at equal step size, so the paper should not credit
    PID's integrator for the gains.
-6. **Selection protocol matters.** Selecting on clean data picks slow settings. A cleaner
-   protocol would select on a shift injected into the validation days (days 18-20) and then
-   evaluate on the test days. That rule rewards recovery without tuning on the test shifts.
-7. Shift size is a single setting (3x). A milder variance shift (for example 1.5x) would show
-   whether the trade-off holds when the shift is less extreme.
+6. **Select on a validation shift.** Selecting on clean data picks slow settings. Selecting on a
+   variance shift injected into the validation days (section 5) picks larger steps, and with them
+   ACI is near target in the day after the shift at about 4% more width than clean selection.
+7. **The result holds for a milder shift.** At 1.5x the base drop is smaller (0.74 in the day after
+   the shift, against 0.63 at 3x), and the ranking from section 5 is unchanged.
